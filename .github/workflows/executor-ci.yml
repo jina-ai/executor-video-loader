@@ -14,10 +14,6 @@ jobs:
       - uses: actions/setup-python@v2
         with:
           python-version: "3.7"
-      - name: Pre-test script
-        run: |
-          if [[ -f "tests/pre_test.sh" ]]; then
-            bash tests/pre_test.sh; fi
       - name: Install latest stable 2.x jina version
         run: |
           JINA_VERSION=$(curl -L -s "https://pypi.org/pypi/jina/json" \
@@ -38,6 +34,8 @@ jobs:
             docker run --entrypoint="normalizer" -v "$(pwd):/workspace" \
             jinahub/hubble-normalizer:latest . --jina-version=2
             sudo chown -R $(id -u ${USER}):$(id -g ${USER}) . ; fi
+      - name: Install ffmpeg reqs
+        run: sudo apt-get -y update && sudo apt-get install -y libsndfile1 ffmpeg
       - name: Run unit tests
         run: pytest -s -v -m "not gpu"
       - id: test_docker

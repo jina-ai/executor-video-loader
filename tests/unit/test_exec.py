@@ -1,12 +1,19 @@
 __copyright__ = 'Copyright (c) 2020-2021 Jina AI Limited. All rights reserved.'
 __license__ = 'Apache-2.0'
 
+import os
 from pathlib import Path
 
+import librosa
+import numpy as np
 import pytest
+from PIL import Image
 from jina import Document, DocumentArray, Executor
 
 from video_loader import VideoLoader
+
+cur_dir = os.path.dirname(os.path.abspath(__file__))
+data_dir = os.path.abspath(os.path.join(cur_dir, '..', 'toy_data'))
 
 
 @pytest.fixture(scope="module")
@@ -22,7 +29,7 @@ def test_config():
 
 def test_no_docucments(encoder: VideoLoader):
     docs = DocumentArray()
-    encoder.extract(docs=docs)
+    encoder.extract(docs=docs, parameters={})
     assert len(docs) == 0  # SUCCESS
 
 
@@ -38,17 +45,16 @@ def test_docs_no_uris(encoder: VideoLoader):
 
 @pytest.mark.parametrize('batch_size', [1, 2, 4, 8])
 def test_batch_encode(encoder: VideoLoader, batch_size: int):
-    docs = DocumentArray(
-        [
-            Document(id=f'2c2OmN49cj8_{idx}.mp4', uri='tests/toy_data/2c2OmN49cj8.mp4')
-            for idx in range(batch_size)
-        ]
-    )
-    encoder.extract(docs=docs)
+    expected_frames = [
+        np.array(Image.open(os.path.join(data_dir, "2c2OmN49cj8-{:04n}.png".format(i)))) for i in range(15)
+    ]
+    expected_audio, sample_rate = librosa.load(os.path.join(data_dir, 'audio.wav'))
+    test_file = os.path.join(data_dir, '2c2OmN49cj8.mp4')
+    docs = DocumentArray([Document(uri=test_file) for _ in range(batch_size)])
+    encoder.extract(docs=docs, parameters={})
     for doc in docs:
-        assert len(doc.chunks) == 16
-        for image_chunk in filter(lambda x: x.modality == 'image', doc.chunks):
-            assert len(image_chunk.blob.shape) == 3
+        c_img = [c.content for c in doc.chunks if c.modality == 'image']
+        assert np.allclose(c_img, expected_frames)
 
-        for audio_chunk in filter(lambda x: x.modality == 'audio', doc.chunks):
-            assert audio_chunk.blob is not None
+        c_audio = [c.content for c in doc.chunks if c.modality == 'audio']
+        assert np.allclose(c_audio, expected_audio)
