@@ -7,8 +7,8 @@ from pathlib import Path
 import librosa
 import numpy as np
 import pytest
-from PIL import Image
 from jina import Document, DocumentArray, Executor
+from PIL import Image
 
 from video_loader import VideoLoader
 
@@ -36,8 +36,7 @@ def test_no_docucments(encoder: VideoLoader):
 def test_docs_no_uris(encoder: VideoLoader):
     docs = DocumentArray([Document()])
 
-    with pytest.raises(ValueError, match='No uri'):
-        encoder.extract(docs=docs, parameters={})
+    encoder.extract(docs=docs, parameters={})
 
     assert len(docs) == 1
     assert len(docs[0].chunks) == 0
@@ -46,7 +45,8 @@ def test_docs_no_uris(encoder: VideoLoader):
 @pytest.mark.parametrize('batch_size', [1, 2, 4, 8])
 def test_batch_encode(encoder: VideoLoader, batch_size: int):
     expected_frames = [
-        np.array(Image.open(os.path.join(data_dir, "2c2OmN49cj8-{:04n}.png".format(i)))) for i in range(15)
+        np.array(Image.open(os.path.join(data_dir, "2c2OmN49cj8-{:04n}.png".format(i))))
+        for i in range(15)
     ]
     expected_audio, sample_rate = librosa.load(os.path.join(data_dir, 'audio.wav'))
     test_file = os.path.join(data_dir, '2c2OmN49cj8.mp4')
