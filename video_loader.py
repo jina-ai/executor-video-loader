@@ -71,9 +71,10 @@ class VideoLoader(Executor):
         :param docs: the input Documents with either the video file name
          or URL in the `uri` field
         :param parameters: A dictionary that contains parameters to control
-         encoding. Possible values are `width`, `height`, 'max_num_frames',
+         extractions and overrides default values.
+        Possible values are `width`, `height`, 'max_num_frames',
          'fps', 'ab', 'ac, 'ar'.
-        For example, `parameters={'frame_width': 512, 'frame_height': 320}`.
+        For example, `parameters={'width': 512, 'height': 320}`.
         """
         exec_args = deepcopy(self._exec_args)
         exec_args.update(parameters)
