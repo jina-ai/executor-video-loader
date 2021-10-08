@@ -23,8 +23,8 @@ def encoder() -> VideoLoader:
 
 def test_config():
     ex = Executor.load_config(str(Path(__file__).parents[2] / 'config.yml'))
-    assert ex.fps == 1
-    assert ex.max_num_frames == 50
+    assert ex._exec_args['fps'] == 1
+    assert ex._exec_args['max_num_frames'] == 50
 
 
 def test_no_docucments(encoder: VideoLoader):
