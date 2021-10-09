@@ -23,11 +23,11 @@ def encoder() -> VideoLoader:
 
 def test_config():
     ex = Executor.load_config(str(Path(__file__).parents[2] / 'config.yml'))
-    assert ex._exec_args['fps'] == 1
-    assert ex._exec_args['max_num_frames'] == 50
+    assert ex._frame_fps == 1
+    assert ex._frame_width == 960
 
 
-def test_no_docucments(encoder: VideoLoader):
+def test_no_documents(encoder: VideoLoader):
     docs = DocumentArray()
     encoder.extract(docs=docs, parameters={})
     assert len(docs) == 0  # SUCCESS
@@ -35,9 +35,7 @@ def test_no_docucments(encoder: VideoLoader):
 
 def test_docs_no_uris(encoder: VideoLoader):
     docs = DocumentArray([Document()])
-
     encoder.extract(docs=docs, parameters={})
-
     assert len(docs) == 1
     assert len(docs[0].chunks) == 0
 
