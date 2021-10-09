@@ -24,7 +24,6 @@ def encoder() -> VideoLoader:
 def test_config():
     ex = Executor.load_config(str(Path(__file__).parents[2] / 'config.yml'))
     assert ex._frame_fps == 1
-    assert ex._frame_width == 960
 
 
 def test_no_documents(encoder: VideoLoader):
