@@ -1,6 +1,7 @@
 __copyright__ = "Copyright (c) 2020-2021 Jina AI Limited. All rights reserved."
 __license__ = "Apache-2.0"
 
+import re
 import io
 import tempfile
 import urllib.request
@@ -48,11 +49,13 @@ class VideoLoader(Executor):
         self._ffmpeg_video_args.setdefault('frame_pts', True)
         self._ffmpeg_video_args.setdefault('s', f'{DEFAULT_FRAME_WIDTH}x{DEFAULT_FRAME_HEIGHT}')
         self._ffmpeg_video_args.setdefault('vsync', 0)
-        self._ffmpeg_video_args.setdefault('vf', DEFAULT_FPS)
+        self._ffmpeg_video_args.setdefault('vf', f'fps={DEFAULT_FPS}')
         w, h = self._ffmpeg_video_args['s'].split('x')
         self._frame_width = int(w)
         self._frame_height = int(h)
-        self._frame_fps = self._ffmpeg_video_args['vf']
+        fps = re.findall('.*fps=(\d+).*', self._ffmpeg_video_args['vf'])
+        if len(fps) > 0:
+            self._frame_fps = int(fps[0])
 
         self._ffmpeg_audio_args = ffmpeg_audio_args or {}
         self._ffmpeg_audio_args.setdefault('format', 'wav')
