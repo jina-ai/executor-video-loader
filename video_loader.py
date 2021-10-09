@@ -24,8 +24,7 @@ DEFAULT_AUDIO_SAMPLING_FREQUENCY = 44100
 
 class VideoLoader(Executor):
     """
-    An executor to extract the image frames, audio, and the subtitle
-    from videos with `ffmpeg`
+    An executor to extract the image frames, audio from videos with `ffmpeg`.
     """
 
     def __init__(
@@ -35,15 +34,12 @@ class VideoLoader(Executor):
         **kwargs,
     ):
         """
-        :param max_num_frames: maximum number of image frames
-         to be extracted from video
-        :param fps: number of frames extracted per second
-        :param width: width of the frames extracted
-        :param height: height of the frames extracted
-        :param ab: Set the audio bitrate
-        :param ac: Set the number of audio channels
-        :param ar: Set the audio sampling frequency
-        :param kwargs: the **kwargs for Executor
+        :param ffmpeg_video_args: the arguments to `ffmpeg` for extracting frames. By default, `format='rawvideo'`,
+            `pix_fmt='rgb24`, `frame_pts=True`, `s='[WIDTH]x[HEIGHT]'`, `vsync=0`, `vf=[FPS]`, where the frame width
+                (WIDTH)=960, the frame height (HEIGHT)=540, the frame per second(FPS)=1.
+        :param ffmpeg_audio_args: the arguments to `ffmpeg` for extracting audios. By default, the output format of the
+            audio  in the buffer `format=='wav'`, the bit rate of the audio `ab=160000`, the number of channels `ac=2`,
+             `ar=44100`
         """
         super().__init__(**kwargs)
         self._ffmpeg_video_args = ffmpeg_video_args or {}
@@ -70,14 +66,13 @@ class VideoLoader(Executor):
     @requests
     def extract(self, docs: Optional[DocumentArray] = None, parameters: Dict = {}, **kwargs):
         """
-        Load the video from the Document.uri, extract frames, audio, subtitle
-        and save it into chunks.
+        Load the video from the Document.uri, extract frames and audio. The extracted data are stored in chunks.
 
         :param docs: the input Documents with either the video file name
          or URL in the `uri` field
         :param parameters: A dictionary that contains parameters to control
          extractions and overrides default values.
-        Possible values are `ffmpeg_audio_args`, `ffmpeg_video_args`.
+        Possible values are `ffmpeg_audio_args`, `ffmpeg_video_args`. Check out more description in the `__init__()`.
         For example, `parameters={'ffmpeg_video_args': {'s': '512x320'}`.
         """
         if docs is None:
@@ -158,9 +153,6 @@ class VideoLoader(Executor):
             raise ValueError(f'{uri}: No such file or directory or URL') from e
 
         return data, sample_rate
-
-    def _convert_video_uri_to_srt(self, source_fn):
-        pass
 
     def _save_uri_to_tmp_file(self, uri, tmp_fn):
         req = urllib.request.Request(uri, headers={'User-Agent': 'Mozilla/5.0'})

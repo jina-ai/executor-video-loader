@@ -1,8 +1,13 @@
 # VideoLoader
 
 The `VideoLoader` [executor](https://docs.jina.ai/fundamentals/executor/) helps in loading the video components into Jina's [`Document`](https://docs.jina.ai/fundamentals/document/) type.
-It extracts the image frames, audio, and the subtitle(if any) from the video using the [`ffmpeg-python`](https://github.com/kkroening/ffmpeg-python).
-The extracted image frames, audio, and the subtitle is then added as `chunks` to the original `Document`
+It extracts the image frames and audio from the video using the [`ffmpeg-python`](https://github.com/kkroening/ffmpeg-python).
 
+The extracted image frames and audio are stored as `chunks` with the following attributes,
 
-Subtitle chunks have the `modality` of `text`, image frame chunks have the `modality` of `image`, and the audio chunks have the `modality` of `audio`.
+Image frame chunks have the `modality` of `image`, and the audio chunks have the `modality` of `audio`.
+
+| data | stored in | `modality` | `location` | `tags` | 
+| --- | --- | --- | --- | --- |
+| image frames | `blob` (dtype=`uint8`) | `image` | the index of the frame | `{'timestampe': 0.5}`, the timestamp of the frame in seconds |
+| audio | `buffer`, binary file stream | `audio` | N/A | `{'sample_rate': 140000}`, the sample rate of the audio |
