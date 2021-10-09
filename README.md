@@ -10,4 +10,4 @@ Image frame chunks have the `modality` of `image`, and the audio chunks have the
 | data | stored in | `modality` | `location` | `tags` | 
 | --- | --- | --- | --- | --- |
 | image frames | `blob` (dtype=`uint8`) | `image` | the index of the frame | `{'timestampe': 0.5}`, the timestamp of the frame in seconds |
-| audio | `buffer`, binary file stream | `audio` | N/A | `{'sample_rate': 140000}`, the sample rate of the audio |
+| audio | `blob` (dtype=`float32`) | `audio` | N/A | `{'sample_rate': 140000}`, the sample rate of the audio |

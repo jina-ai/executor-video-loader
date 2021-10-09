@@ -46,7 +46,7 @@ def test_batch_encode(encoder: VideoLoader, batch_size: int):
         np.array(Image.open(os.path.join(data_dir, "2c2OmN49cj8-{:04n}.png".format(i))))
         for i in range(15)
     ]
-    expected_audio, sample_rate = librosa.load(os.path.join(data_dir, 'audio.wav'))
+    expected_audio, sample_rate = librosa.load(os.path.join(data_dir, 'audio.wav'), **encoder._librosa_load_args)
     test_file = os.path.join(data_dir, '2c2OmN49cj8.mp4')
     docs = DocumentArray([Document(uri=test_file) for _ in range(batch_size)])
     encoder.extract(docs=docs, parameters={})
