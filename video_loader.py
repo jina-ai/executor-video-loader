@@ -18,7 +18,7 @@ from jina.types.document import _is_datauri
 DEFAULT_FPS = 1
 DEFAULT_AUDIO_BIT_RATE = 160000
 DEFAULT_AUDIO_CHANNELS = 2
-DEFAULT_AUDIO_SAMPLING_FREQUENCY = 44100
+DEFAULT_AUDIO_SAMPLING_RATE = 44100  # Hz
 
 
 class VideoLoader(Executor):
@@ -59,7 +59,7 @@ class VideoLoader(Executor):
         self._ffmpeg_audio_args.setdefault('format', 'wav')
         self._ffmpeg_audio_args.setdefault('ab', DEFAULT_AUDIO_BIT_RATE)
         self._ffmpeg_audio_args.setdefault('ac', DEFAULT_AUDIO_CHANNELS)
-        self._ffmpeg_audio_args.setdefault('ar', DEFAULT_AUDIO_SAMPLING_FREQUENCY)
+        self._ffmpeg_audio_args.setdefault('ar', DEFAULT_AUDIO_SAMPLING_RATE)
 
         self._librosa_load_args = librosa_load_args or {}
         self._librosa_load_args.setdefault(
