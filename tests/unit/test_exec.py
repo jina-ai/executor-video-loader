@@ -1,24 +1,13 @@
 __copyright__ = 'Copyright (c) 2020-2021 Jina AI Limited. All rights reserved.'
 __license__ = 'Apache-2.0'
 
-import os
 from pathlib import Path
 
-import librosa
 import numpy as np
 import pytest
 from jina import Document, DocumentArray, Executor
-from PIL import Image
 
 from video_loader import VideoLoader
-
-cur_dir = os.path.dirname(os.path.abspath(__file__))
-data_dir = os.path.abspath(os.path.join(cur_dir, '..', 'toy_data'))
-
-
-@pytest.fixture(scope="module")
-def encoder() -> VideoLoader:
-    return VideoLoader()
 
 
 def test_config():
@@ -26,29 +15,23 @@ def test_config():
     assert ex._frame_fps == 1
 
 
-def test_no_documents(encoder: VideoLoader):
+def test_no_documents(videoLoader: VideoLoader):
     docs = DocumentArray()
-    encoder.extract(docs=docs, parameters={})
+    videoLoader.extract(docs=docs)
     assert len(docs) == 0  # SUCCESS
 
 
-def test_docs_no_uris(encoder: VideoLoader):
+def test_docs_no_uris(videoLoader: VideoLoader):
     docs = DocumentArray([Document()])
-    encoder.extract(docs=docs, parameters={})
+    videoLoader.extract(docs=docs)
     assert len(docs) == 1
     assert len(docs[0].chunks) == 0
 
 
 @pytest.mark.parametrize('batch_size', [1, 2, 4, 8])
-def test_batch_encode(encoder: VideoLoader, batch_size: int):
-    expected_frames = [
-        np.array(Image.open(os.path.join(data_dir, "2c2OmN49cj8-{:04n}.png".format(i))))
-        for i in range(15)
-    ]
-    expected_audio, sample_rate = librosa.load(os.path.join(data_dir, 'audio.wav'), **encoder._librosa_load_args)
-    test_file = os.path.join(data_dir, '2c2OmN49cj8.mp4')
-    docs = DocumentArray([Document(uri=test_file) for _ in range(batch_size)])
-    encoder.extract(docs=docs, parameters={})
+def test_batch_encode(expected_frames, expected_audio, video_fn, videoLoader: VideoLoader, batch_size: int):
+    docs = DocumentArray([Document(uri=video_fn) for _ in range(batch_size)])
+    videoLoader.extract(docs=docs, parameters={})
     for doc in docs:
         c_img = [c.content for c in doc.chunks if c.modality == 'image']
         assert np.allclose(c_img, expected_frames)
