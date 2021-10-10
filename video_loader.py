@@ -6,7 +6,7 @@ import io
 import tempfile
 import urllib.request
 from copy import deepcopy
-from typing import Dict, Optional
+from typing import Dict, Iterable, Optional
 
 import ffmpeg
 import librosa
@@ -28,12 +28,15 @@ class VideoLoader(Executor):
 
     def __init__(
         self,
+        modality_list: Iterable[str] = ('image', 'audio'),
         ffmpeg_video_args: Optional[Dict] = None,
         ffmpeg_audio_args: Optional[Dict] = None,
         librosa_load_args: Optional[Dict] = None,
         **kwargs,
     ):
         """
+        :param modality_list: the data from different modalities to be extracted. By default,
+            `modality_list=('image', 'audio')`, both image frames and audio track are extracted.
         :param ffmpeg_video_args: the arguments to `ffmpeg` for extracting frames. By default, `format='rawvideo'`,
             `pix_fmt='rgb24`, `frame_pts=True`, `vsync=0`, `vf=[FPS]`, where the frame per second(FPS)=1. The width and
             the height of the extracted frames are the same as the original video. To reset width=960 and height=540,
@@ -45,6 +48,7 @@ class VideoLoader(Executor):
             (`mono`) is `True` when `ffmpeg_audio_args['ac'] > 1`
         """
         super().__init__(**kwargs)
+        self._modality = modality_list
         self._ffmpeg_video_args = ffmpeg_video_args or {}
         self._ffmpeg_video_args.setdefault('format', 'rawvideo')
         self._ffmpeg_video_args.setdefault('pix_fmt', 'rgb24')
@@ -75,8 +79,7 @@ class VideoLoader(Executor):
         """
         Load the video from the Document.uri, extract frames and audio. The extracted data are stored in chunks.
 
-        :param docs: the input Documents with either the video file name
-         or URL in the `uri` field
+        :param docs: the input Documents with either the video file name or data URI in the `uri` field
         :param parameters: A dictionary that contains parameters to control
          extractions and overrides default values.
         Possible values are `ffmpeg_audio_args`, `ffmpeg_video_args`, `librosa_load_args`. Check out more description in the `__init__()`.
@@ -98,31 +101,34 @@ class VideoLoader(Executor):
                     source_fn = tmp_f.name
 
                 # extract all the frames video
-                ffmpeg_video_args = deepcopy(self._ffmpeg_video_args)
-                ffmpeg_video_args.update(parameters.get('ffmpeg_video_args', {}))
-                frame_blobs = self._convert_video_uri_to_frames(
-                    source_fn,
-                    doc.uri,
-                    ffmpeg_video_args)
-                for idx, frame_blob in enumerate(frame_blobs):
-                    self.logger.debug(f'frame: {idx}')
-                    chunk = Document(modality='image')
-                    chunk.blob = np.array(frame_blob).astype('uint8')
-                    chunk.location.append(np.uint32(idx))
-                    chunk.tags['timestamp'] = idx / self._frame_fps
-                    doc.chunks.append(chunk)
+                if 'image' in self._modality:
+                    ffmpeg_video_args = deepcopy(self._ffmpeg_video_args)
+                    ffmpeg_video_args.update(parameters.get('ffmpeg_video_args', {}))
+                    frame_blobs = self._convert_video_uri_to_frames(
+                        source_fn,
+                        doc.uri,
+                        ffmpeg_video_args)
+                    for idx, frame_blob in enumerate(frame_blobs):
+                        self.logger.debug(f'frame: {idx}')
+                        chunk = Document(modality='image')
+                        chunk.blob = np.array(frame_blob).astype('uint8')
+                        chunk.location.append(np.uint32(idx))
+                        chunk.tags['timestamp'] = idx / self._frame_fps
+                        doc.chunks.append(chunk)
 
                 # add audio as chunks to the Document, modality='audio'
-                ffmpeg_audio_args = deepcopy(self._ffmpeg_audio_args)
-                ffmpeg_audio_args.update(parameters.get('ffmpeg_audio_args', {}))
-                librosa_load_args = deepcopy(self._librosa_load_args)
-                librosa_load_args.update(parameters.get('librosa_load_args', {}))
-                audio, sr = self._convert_video_uri_to_audio(
-                    source_fn,
-                    doc.uri,
-                    ffmpeg_audio_args,
-                    librosa_load_args)
-                if audio is not None:
+                if 'audio' in self._modality:
+                    ffmpeg_audio_args = deepcopy(self._ffmpeg_audio_args)
+                    ffmpeg_audio_args.update(parameters.get('ffmpeg_audio_args', {}))
+                    librosa_load_args = deepcopy(self._librosa_load_args)
+                    librosa_load_args.update(parameters.get('librosa_load_args', {}))
+                    audio, sr = self._convert_video_uri_to_audio(
+                        source_fn,
+                        doc.uri,
+                        ffmpeg_audio_args,
+                        librosa_load_args)
+                    if audio is None:
+                        continue
                     chunk = Document(modality='audio')
                     chunk.blob, chunk.tags['sample_rate'] = audio, sr
                     doc.chunks.append(chunk)
