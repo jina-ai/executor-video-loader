@@ -1,11 +1,14 @@
 __copyright__ = "Copyright (c) 2020-2021 Jina AI Limited. All rights reserved."
 __license__ = "Apache-2.0"
 
+import os
 import re
 import io
+import string
 import tempfile
 import urllib.request
 from copy import deepcopy
+import random
 from typing import Dict, Iterable, Optional
 
 import ffmpeg
@@ -14,6 +17,7 @@ import numpy as np
 from jina import Document, DocumentArray, Executor, requests
 from jina.logging.logger import JinaLogger
 from jina.types.document import _is_datauri
+from pathlib import Path
 
 DEFAULT_FPS = 1
 DEFAULT_AUDIO_BIT_RATE = 160000
@@ -94,11 +98,12 @@ class VideoLoader(Executor):
                 self.logger.error(f'No uri passed for the Document: {doc.id}')
                 continue
 
-            with tempfile.NamedTemporaryFile(suffix='.mp4') as tmp_f:
-                source_fn = doc.uri
-                if _is_datauri(doc.uri):
-                    self._save_uri_to_tmp_file(doc.uri, tmp_f)
-                    source_fn = tmp_f.name
+            with tempfile.TemporaryDirectory() as tmpdir:
+                source_fn = (
+                    self._save_uri_to_tmp_file(doc.uri, tmpdir)
+                    if _is_datauri(doc.uri)
+                    else doc.uri
+                )
 
                 # extract all the frames video
                 if 'image' in self._modality:
@@ -135,12 +140,12 @@ class VideoLoader(Executor):
 
     def _convert_video_uri_to_frames(self, source_fn, uri, ffmpeg_args):
         # get width and height
-        video = ffmpeg.probe(source_fn)['streams'][0]
-        w, h = ffmpeg_args.get('s', f'{video["width"]}x{video["height"]}').split('x')
-        w = int(w)
-        h = int(h)
         video_frames = []
         try:
+            video = ffmpeg.probe(source_fn)['streams'][0]
+            w, h = ffmpeg_args.get('s', f'{video["width"]}x{video["height"]}').split('x')
+            w = int(w)
+            h = int(h)
             out, _ = (
                 ffmpeg.input(source_fn)
                 .output(
@@ -152,7 +157,6 @@ class VideoLoader(Executor):
             video_frames = np.frombuffer(out, np.uint8).reshape([-1, h, w, 3])
         except ffmpeg.Error as e:
             self.logger.error(f'Frame extraction failed, {uri}, {e.stderr}')
-            raise ValueError(f'{uri}: No such file or directory or URL') from e
 
         return video_frames
 
@@ -174,9 +178,16 @@ class VideoLoader(Executor):
         finally:
             return data, sample_rate
 
-    def _save_uri_to_tmp_file(self, uri, tmp_fn):
+    def _save_uri_to_tmp_file(self, uri, tmpdir):
         req = urllib.request.Request(uri, headers={'User-Agent': 'Mozilla/5.0'})
+        tmp_fn = os.path.join(
+            tmpdir,
+            ''.join([random.choice(string.ascii_lowercase) for i in range(10)])
+            + '.mp4',
+        )
         with urllib.request.urlopen(req) as fp:
             buffer = fp.read()
             binary_fn = io.BytesIO(buffer)
-            tmp_fn.write(binary_fn.read())
+            with open(tmp_fn, 'wb') as f:
+                f.write(binary_fn.read())
+        return tmp_fn
