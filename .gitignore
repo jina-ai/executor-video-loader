@@ -141,6 +141,5 @@ Cargo.lock
 
 workspace
 .jina
-Dockerfile
 __jina__.Dockerfile
 nohup.out
