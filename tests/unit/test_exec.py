@@ -28,19 +28,24 @@ def test_docs_no_uris(videoLoader: VideoLoader):
     assert len(docs[0].chunks) == 0
 
 
-@pytest.mark.parametrize('batch_size', [1, 2, 4, 8])
-def test_batch_encode(expected_frames, expected_audio, video_fn, videoLoader: VideoLoader, batch_size: int):
+@pytest.mark.parametrize('batch_size', [1, 2, 4])
+def test_batch_extract(expected_frames, expected_audio, video_fn, videoLoader: VideoLoader, batch_size: int):
     docs = DocumentArray([Document(uri=video_fn) for _ in range(batch_size)])
     videoLoader.extract(docs=docs)
     for doc in docs:
         c_img = [c.content for c in doc.chunks if c.modality == 'image']
-        assert np.allclose(c_img, expected_frames)
+        assert np.allclose(c_img[:5], expected_frames[:5])
 
         c_audio = [c.content for c in doc.chunks if c.modality == 'audio']
         assert np.allclose(c_audio, expected_audio)
 
+        c_subtitles = [c.content for c in doc.chunks if c.modality == 'text']
+        assert len(c_subtitles) == 30
 
-@pytest.mark.parametrize('modality', [('image',), ('audio',), ('image', 'audio')])
+
+@pytest.mark.parametrize(
+    'modality', [('image',), ('audio',), ('text',), ('image', 'audio', 'text')]
+)
 def test_modality(video_fn, modality):
     videoLoader = VideoLoader(modality_list=modality)
     docs = DocumentArray([Document(uri=video_fn)])
@@ -50,20 +55,23 @@ def test_modality(video_fn, modality):
             assert c.modality in modality
 
 
-def test_encode_datauri(expected_frames, expected_audio, video_fn, videoLoader: VideoLoader):
+def test_extract_with_datauri(expected_frames, expected_audio, video_fn, videoLoader: VideoLoader):
     doc = Document(uri=video_fn)
     doc.convert_uri_to_datauri()
     docs = DocumentArray([doc])
     videoLoader.extract(docs=docs)
     for doc in docs:
         c_img = [c.content for c in doc.chunks if c.modality == 'image']
-        assert np.allclose(c_img, expected_frames)
+        assert np.allclose(c_img[:5], expected_frames[:5])
 
         c_audio = [c.content for c in doc.chunks if c.modality == 'audio']
         assert np.allclose(c_audio, expected_audio)
 
+        c_subtitles = [c.content for c in doc.chunks if c.modality == 'text']
+        assert len(c_subtitles) == 30
 
-def test_catch_image(caplog, video_fn, videoLoader):
+
+def test_catch_exception(caplog, video_fn, videoLoader):
     docs = DocumentArray([Document(uri='tests/toy_data/dummy.mp4')])  # wrong uri
     videoLoader.logger.propagate = True
     videoLoader.extract(docs=docs)

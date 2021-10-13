@@ -12,7 +12,7 @@ data_dir = (Path(__file__).parent / 'toy_data').absolute()
 
 @pytest.fixture(scope='session')
 def video_fn():
-    return str(data_dir / '2c2OmN49cj8.mp4')
+    return str(data_dir / '1bh98dhj3.mkv')
 
 @pytest.fixture(scope='function')
 def expected_frames(tmp_path, video_fn):

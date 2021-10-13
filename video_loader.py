@@ -1,23 +1,23 @@
 __copyright__ = "Copyright (c) 2020-2021 Jina AI Limited. All rights reserved."
 __license__ = "Apache-2.0"
 
-import os
-import re
 import io
+import os
+import random
+import re
 import string
 import tempfile
 import urllib.request
 from copy import deepcopy
-import random
 from typing import Dict, Iterable, Optional
 
 import ffmpeg
 import librosa
 import numpy as np
+import webvtt
 from jina import Document, DocumentArray, Executor, requests
 from jina.logging.logger import JinaLogger
 from jina.types.document import _is_datauri
-from pathlib import Path
 
 DEFAULT_FPS = 1
 DEFAULT_AUDIO_BIT_RATE = 160000
@@ -32,9 +32,10 @@ class VideoLoader(Executor):
 
     def __init__(
         self,
-        modality_list: Iterable[str] = ('image', 'audio'),
+        modality_list: Iterable[str] = ('image', 'audio', 'text'),
         ffmpeg_video_args: Optional[Dict] = None,
         ffmpeg_audio_args: Optional[Dict] = None,
+        ffmpeg_subtitle_args: Optional[Dict] = None,
         librosa_load_args: Optional[Dict] = None,
         **kwargs,
     ):
@@ -47,6 +48,9 @@ class VideoLoader(Executor):
             use `ffmpeg_video_args={'s': '960x540'`}.
         :param ffmpeg_audio_args: the arguments to `ffmpeg` for extracting audios. By default, the bit rate of the audio
              `ab=160000`, the number of channels `ac=2`, the sampling rate `ar=44100`
+        :param ffmpeg_audio_args: the arguments to `ffmpeg` for extracting subtitle. By default, we extract the first
+            subtitle by setting `map='0:s:0'`. To extract second subtitle in a video use
+            `ffmpeg_subtitle_args{map='0:s:1'}` and so on.
         :param librosa_load_args: the arguments to `librosa.load()` for converting audio data into `blob`. By default,
             the sampling rate (`sr`) is the same as in `ffmpeg_audio_args['ar']`, the flag for converting to mono
             (`mono`) is `True` when `ffmpeg_audio_args['ac'] > 1`
@@ -68,6 +72,9 @@ class VideoLoader(Executor):
         self._ffmpeg_audio_args.setdefault('ab', DEFAULT_AUDIO_BIT_RATE)
         self._ffmpeg_audio_args.setdefault('ac', DEFAULT_AUDIO_CHANNELS)
         self._ffmpeg_audio_args.setdefault('ar', DEFAULT_AUDIO_SAMPLING_RATE)
+
+        self._ffmpeg_subtitle_args = ffmpeg_subtitle_args or {}
+        self._ffmpeg_subtitle_args.setdefault('map', '0:s')
 
         self._librosa_load_args = librosa_load_args or {}
         self._librosa_load_args.setdefault(
@@ -138,6 +145,25 @@ class VideoLoader(Executor):
                     chunk.blob, chunk.tags['sample_rate'] = audio, sr
                     doc.chunks.append(chunk)
 
+                # add subtitle ad chunks to the Document, modality='text'
+                if 'text' in self._modality:
+                    ffmpeg_subtitle_args = deepcopy(self._ffmpeg_subtitle_args)
+                    ffmpeg_subtitle_args.update(
+                        parameters.get('ffmpeg_subtitle_args', {})
+                    )
+                    subtitles = self._convert_video_uri_to_subtitle(
+                        source_fn, doc.uri, ffmpeg_subtitle_args, tmpdir
+                    )
+                    # subtitles = self._load_subtitles(doc.uri)
+                    for idx, (beg, end, s) in enumerate(subtitles):
+                        len_tokens = len([t for t in s.split(' ')])
+                        chunk = Document(id=f'{doc.id}_{idx}', text=s, modality='text')
+                        chunk.tags['beg_in_seconds'] = beg
+                        chunk.tags['end_in_seconds'] = end
+                        chunk.location.append(int(beg * 1000))  # location in milliseconds
+                        chunk.location.append(int(end * 1000))  # location in milliseconds
+                        doc.chunks.append(chunk)
+
     def _convert_video_uri_to_frames(self, source_fn, uri, ffmpeg_args):
         # get width and height
         video_frames = []
@@ -178,6 +204,23 @@ class VideoLoader(Executor):
         finally:
             return data, sample_rate
 
+    def _convert_video_uri_to_subtitle(self, source_fn, uri, ffmpeg_args, tmp_dir):
+        subtitle_file = str(os.path.join(tmp_dir, 'subs.vtt'))
+        subtitles = []
+        try:
+            out, _ = (
+                ffmpeg.input(source_fn)
+                .output(subtitle_file, map='0:s:0')
+                .run(capture_stdout=True, quiet=True)
+            )
+            subtitles = self._process_subtitles(subtitle_file)
+        except ffmpeg.Error as e:
+            self.logger.error(
+                f'Subtitle extraction failed with ffmpeg, uri: {uri}, {e.stderr}'
+            )
+        finally:
+            return subtitles
+
     def _save_uri_to_tmp_file(self, uri, tmpdir):
         req = urllib.request.Request(uri, headers={'User-Agent': 'Mozilla/5.0'})
         tmp_fn = os.path.join(
@@ -191,3 +234,32 @@ class VideoLoader(Executor):
             with open(tmp_fn, 'wb') as f:
                 f.write(binary_fn.read())
         return tmp_fn
+
+    def _process_subtitles(self, subtitle_file):
+        beg = None
+        is_last_cap_complete = True
+        subtitles = []
+        prev_parts = []
+        for caption in webvtt.read(subtitle_file):
+            # print(f'{repr(caption.text)}')
+            cur_parts = [
+                t
+                for t in filter(lambda x: len(x.strip()) > 0, caption.text.split('\n'))
+            ]
+            filtered_text = ' '.join(cur_parts)
+            if len(cur_parts) == 1:
+                if cur_parts[0] in prev_parts:
+                    continue
+            if len(cur_parts) > 1:
+                if cur_parts[0] in prev_parts and is_last_cap_complete:
+                    filtered_text = ' '.join(cur_parts[1:])
+            is_cur_complete = True
+            if is_last_cap_complete:
+                beg = caption.start_in_seconds
+            if caption.text.startswith(' \n') or caption.text.endswith('\n '):
+                is_cur_complete = False
+            if is_cur_complete:
+                subtitles.append((beg, caption.end_in_seconds, filtered_text))
+            is_last_cap_complete = is_cur_complete
+            prev_parts = cur_parts
+        return subtitles
