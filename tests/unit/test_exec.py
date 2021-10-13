@@ -28,7 +28,7 @@ def test_docs_no_uris(videoLoader: VideoLoader):
     assert len(docs[0].chunks) == 0
 
 
-@pytest.mark.parametrize('batch_size', [1, 2, 4])
+@pytest.mark.parametrize('batch_size', [1, 2])
 def test_batch_extract(expected_frames, expected_audio, video_fn, videoLoader: VideoLoader, batch_size: int):
     docs = DocumentArray([Document(uri=video_fn) for _ in range(batch_size)])
     videoLoader.extract(docs=docs)
