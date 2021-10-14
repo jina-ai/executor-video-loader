@@ -23,6 +23,7 @@ DEFAULT_FPS = 1
 DEFAULT_AUDIO_BIT_RATE = 160000
 DEFAULT_AUDIO_CHANNELS = 2
 DEFAULT_AUDIO_SAMPLING_RATE = 44100  # Hz
+DEFAULT_SUBTITLE_MAP = '0:s:0'
 
 
 class VideoLoader(Executor):
@@ -48,7 +49,7 @@ class VideoLoader(Executor):
             use `ffmpeg_video_args={'s': '960x540'`}.
         :param ffmpeg_audio_args: the arguments to `ffmpeg` for extracting audios. By default, the bit rate of the audio
              `ab=160000`, the number of channels `ac=2`, the sampling rate `ar=44100`
-        :param ffmpeg_audio_args: the arguments to `ffmpeg` for extracting subtitle. By default, we extract the first
+        :param ffmpeg_subtitle_args: the arguments to `ffmpeg` for extracting subtitle. By default, we extract the first
             subtitle by setting `map='0:s:0'`. To extract second subtitle in a video use
             `ffmpeg_subtitle_args{map='0:s:1'}` and so on.
         :param librosa_load_args: the arguments to `librosa.load()` for converting audio data into `blob`. By default,
@@ -74,7 +75,7 @@ class VideoLoader(Executor):
         self._ffmpeg_audio_args.setdefault('ar', DEFAULT_AUDIO_SAMPLING_RATE)
 
         self._ffmpeg_subtitle_args = ffmpeg_subtitle_args or {}
-        self._ffmpeg_subtitle_args.setdefault('map', '0:s')
+        self._ffmpeg_subtitle_args.setdefault('map', DEFAULT_SUBTITLE_MAP)
 
         self._librosa_load_args = librosa_load_args or {}
         self._librosa_load_args.setdefault(
@@ -152,22 +153,19 @@ class VideoLoader(Executor):
                         parameters.get('ffmpeg_subtitle_args', {})
                     )
                     subtitles = self._convert_video_uri_to_subtitle(
-                        source_fn, doc.uri, ffmpeg_subtitle_args, tmpdir
+                        source_fn, ffmpeg_subtitle_args, tmpdir
                     )
-                    # subtitles = self._load_subtitles(doc.uri)
                     for idx, (beg, end, s) in enumerate(subtitles):
-                        len_tokens = len([t for t in s.split(' ')])
-                        chunk = Document(id=f'{doc.id}_{idx}', text=s, modality='text')
+                        chunk = Document(text=s, modality='text')
                         chunk.tags['beg_in_seconds'] = beg
                         chunk.tags['end_in_seconds'] = end
-                        chunk.location.append(int(beg * 1000))  # location in milliseconds
-                        chunk.location.append(int(end * 1000))  # location in milliseconds
+                        chunk.location.append(idx)  # index of the subtitle in the video
                         doc.chunks.append(chunk)
 
     def _convert_video_uri_to_frames(self, source_fn, uri, ffmpeg_args):
-        # get width and height
         video_frames = []
         try:
+            # get width and height
             video = ffmpeg.probe(source_fn)['streams'][0]
             w, h = ffmpeg_args.get('s', f'{video["width"]}x{video["height"]}').split('x')
             w = int(w)
@@ -204,19 +202,19 @@ class VideoLoader(Executor):
         finally:
             return data, sample_rate
 
-    def _convert_video_uri_to_subtitle(self, source_fn, uri, ffmpeg_args, tmp_dir):
+    def _convert_video_uri_to_subtitle(self, source_fn, ffmpeg_args, tmp_dir):
         subtitle_file = str(os.path.join(tmp_dir, 'subs.vtt'))
         subtitles = []
         try:
             out, _ = (
                 ffmpeg.input(source_fn)
-                .output(subtitle_file, map='0:s:0')
+                .output(subtitle_file, **ffmpeg_args)
                 .run(capture_stdout=True, quiet=True)
             )
             subtitles = self._process_subtitles(subtitle_file)
         except ffmpeg.Error as e:
             self.logger.error(
-                f'Subtitle extraction failed with ffmpeg, uri: {uri}, {e.stderr}'
+                f'Subtitle extraction failed with ffmpeg, {e.stderr}'
             )
         finally:
             return subtitles
@@ -241,7 +239,6 @@ class VideoLoader(Executor):
         subtitles = []
         prev_parts = []
         for caption in webvtt.read(subtitle_file):
-            # print(f'{repr(caption.text)}')
             cur_parts = [
                 t
                 for t in filter(lambda x: len(x.strip()) > 0, caption.text.split('\n'))
