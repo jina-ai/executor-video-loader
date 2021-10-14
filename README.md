@@ -5,7 +5,7 @@ It extracts the image frames, audio, and subtitle from the video using the [`ffm
 
 The extracted image frames, audio, and subtitle are stored as `chunks` with the following attributes,
 
-Image frame chunks have the `modality` of `image`, the audio chunks have the `modality` of `audio`, and the subtitle chunks have the `modality` of `text`. During parsing of subtitles, duplicated captions are merged to form unique captions and are returned as single chunk with their respective starting and ending time in `tags`. 
+Image frame chunks have the `modality` of `image`, the audio chunks have the `modality` of `audio`, and the subtitle chunks have the `modality` of `text`. During parsing of subtitles, duplicated captions are merged to form unique captions in a heuristic way and are returned as single chunk with their respective starting and ending time in `tags`. 
 
 | data | stored in | `modality` | `location` | `tags` | 
 | --- | --- | --- | --- | --- |
