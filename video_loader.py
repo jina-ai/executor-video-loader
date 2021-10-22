@@ -86,7 +86,7 @@ class VideoLoader(Executor):
             getattr(self.metas, 'name', self.__class__.__name__)
         ).logger
 
-    @requests
+    @requests(on='/extract')
     def extract(self, docs: Optional[DocumentArray] = None, parameters: Dict = {}, **kwargs):
         """
         Load the video from the Document.uri, extract frames and audio. The extracted data are stored in chunks.
