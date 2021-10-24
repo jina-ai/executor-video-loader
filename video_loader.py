@@ -204,15 +204,15 @@ class VideoLoader(Executor):
             return data, sample_rate
 
     def _convert_video_uri_to_subtitle(self, source_fn, ffmpeg_args, tmp_dir):
-        subtitle_file = str(os.path.join(tmp_dir, 'subs.srt'))
+        subtitle_fn = str(os.path.join(tmp_dir, 'subs.srt'))
         subtitles = []
         try:
             out, _ = (
                 ffmpeg.input(source_fn)
-                .output(subtitle_file, **ffmpeg_args)
+                .output(subtitle_fn, **ffmpeg_args)
                 .run(capture_stdout=True, quiet=True)
             )
-            subtitles = self._process_subtitles(subtitle_file)
+            subtitles = self._process_subtitles(Path(subtitle_fn))
         except ffmpeg.Error as e:
             self.logger.error(
                 f'Subtitle extraction failed with ffmpeg, {e.stderr}'
@@ -234,12 +234,12 @@ class VideoLoader(Executor):
                 f.write(binary_fn.read())
         return tmp_fn
 
-    def _process_subtitles(self, srt_fn):
+    def _process_subtitles(self, srt_path: Path, vtt_path: Path=None, tmp_srt_path: Path=None):
         beg = None
         is_last_cap_complete = True
         subtitles = []
         prev_parts = []
-        vtt_fn = self._convert_srt_to_vtt(srt_fn)
+        vtt_fn = self._convert_srt_to_vtt(srt_path, vtt_path, tmp_srt_path)
         for caption in webvtt.read(vtt_fn):
             cur_parts = [
                 t
@@ -258,7 +258,8 @@ class VideoLoader(Executor):
             if caption.text.startswith(' \n') or caption.text.endswith('\n '):
                 is_cur_complete = False
             if is_cur_complete:
-                subtitles.append((beg, caption.end_in_seconds, filtered_text))
+                if filtered_text:
+                    subtitles.append((beg, caption.end_in_seconds, filtered_text))
             is_last_cap_complete = is_cur_complete
             prev_parts = cur_parts
         return subtitles
@@ -267,31 +268,30 @@ class VideoLoader(Executor):
         scheme = urllib.parse.urlparse(uri).scheme
         return scheme in {'data'}
 
-    def _remove_carriage_return(self, input_fn):
+    def _remove_carriage_return(self, input_path, output_path=None):
         result = []
-        with open(input_fn, 'rb') as f:
+        with open(input_path, 'rb') as f:
             for l in f:
                 if l == b'\r\n':
                     continue
                 new_l = l.decode('utf8').replace('\r\n', '\n')
                 new_l = new_l.rstrip('\n')
                 result.append(new_l)
-        _input_path = input_fn
-        output_fn = f'{_input_path.stem}_no_cr{_input_path.suffix}'
-        output_fn = str(_input_path.parent / output_fn)
-        with open(output_fn, 'w') as f:
+        if output_path is None:
+            output_fn = f'{input_path.stem}_no_cr{input_path.suffix}'
+            output_path = input_path.parent / output_fn
+        with open(output_path, 'w') as f:
             f.write('\n'.join(result))
-        return output_fn
+        return output_path
 
-    def _convert_srt_to_vtt(self, srt_file):
-        _srt_path = Path(srt_file)
-        _vtt_path = _srt_path.parent / f'{_srt_path.stem}.vtt'
-        # _vtt_fn = str(_vtt_path)
+    def _convert_srt_to_vtt(self, srt_path: Path, vtt_path: Path=None, tmp_srt_path: Path=None):
+        if vtt_path is None:
+            vtt_path = srt_path.parent / f'{srt_path.stem}.vtt'
         try:
-            result = webvtt.from_srt(_srt_path)
+            result = webvtt.from_srt(srt_path)
         except webvtt.errors.MalformedCaptionError as e:
             self.logger.warning('remove carriage returns from the .srt file')
-            _srt_fn = self._remove_carriage_return(_srt_path)
-            result = webvtt.from_srt(_srt_fn)
-        result.save(output=_vtt_path)
-        return _vtt_path
+            srt_path = self._remove_carriage_return(srt_path, tmp_srt_path)
+            result = webvtt.from_srt(srt_path)
+        result.save(output=vtt_path)
+        return vtt_path

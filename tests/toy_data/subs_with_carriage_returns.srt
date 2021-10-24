@@ -1,0 +1,49 @@
+1
+00:00:01,040 --> 00:00:03,830
+
+hi my name is han founder and ceo of
+
+2
+00:00:03,830 --> 00:00:03,840
+hi my name is han founder and ceo of
+ 
+
+3
+00:00:03,840 --> 00:00:04,789
+hi my name is han founder and ceo of
+gene ai
+
+4
+00:00:04,789 --> 00:00:04,799
+gene ai
+ 
+
+5
+00:00:04,799 --> 00:00:07,030
+gene ai
+in this episode i'm going to introduce
+
+6
+00:00:07,030 --> 00:00:07,040
+in this episode i'm going to introduce
+ 
+
+7
+00:00:07,040 --> 00:00:11,589
+in this episode i'm going to introduce
+you some basic concepts in gina
+
+8
+00:00:11,589 --> 00:00:11,599
+
+ 
+
+9
+00:00:11,599 --> 00:00:14,070
+
+gina is an easier way to develop neural
+
+10
+00:00:14,070 --> 00:00:14,080
+gina is an easier way to develop neural
+ 
