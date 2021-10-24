@@ -8,6 +8,7 @@ import re
 import string
 import tempfile
 import urllib.request
+import urllib.parse
 from copy import deepcopy
 from typing import Dict, Iterable, Optional
 
@@ -17,7 +18,6 @@ import numpy as np
 import webvtt
 from jina import Document, DocumentArray, Executor, requests
 from jina.logging.logger import JinaLogger
-from jina.types.document import _is_datauri
 
 DEFAULT_FPS = 1
 DEFAULT_AUDIO_BIT_RATE = 160000
@@ -109,7 +109,7 @@ class VideoLoader(Executor):
             with tempfile.TemporaryDirectory() as tmpdir:
                 source_fn = (
                     self._save_uri_to_tmp_file(doc.uri, tmpdir)
-                    if _is_datauri(doc.uri)
+                    if self._is_datauri(doc.uri)
                     else doc.uri
                 )
 
@@ -260,3 +260,7 @@ class VideoLoader(Executor):
             is_last_cap_complete = is_cur_complete
             prev_parts = cur_parts
         return subtitles
+
+    def _is_datauri(self, uri):
+        scheme = urllib.parse.urlparse(uri).scheme
+        return scheme in {'data'}
