@@ -41,3 +41,6 @@ def expected_audio(tmp_path, video_fn, videoLoader):
     return expected_audio
 
 
+@pytest.fixture(scope='session')
+def srt_path():
+    return data_dir / 'subs_with_carriage_returns.srt'

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import webvtt
 from jina import Document, DocumentArray, Executor
 
 from video_loader import VideoLoader
@@ -77,3 +78,16 @@ def test_catch_exception(caplog, video_fn, videoLoader):
     videoLoader.extract(docs=docs)
     assert 'Audio extraction failed' in caplog.text
     assert 'Frame extraction failed' in caplog.text
+
+
+def test_process_subtitles(srt_path, tmpdir, videoLoader):
+    subtitles = videoLoader._process_subtitles(
+        srt_path, tmpdir / 'sub.vtt', tmpdir / 'sub_tmp.srt')
+    print(subtitles)
+    assert len(subtitles) == 5
+
+def test_convert_srt_to_vtt(srt_path, tmpdir, videoLoader):
+    vtt_fn = videoLoader._convert_srt_to_vtt(
+        srt_path, vtt_path=tmpdir / 'sub.vtt', tmp_srt_path=tmpdir / 'sub_tmp.srt')
+    assert vtt_fn.exists()
+    assert len(webvtt.read(vtt_fn)) == 10
