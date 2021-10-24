@@ -11,7 +11,7 @@ def test_integration(expected_frames, expected_audio):
     da = DocumentArray(
         [Document(id='1bh98dhj3.mkv', uri='tests/toy_data/1q83w3rehj3.mkv')]
     )
-    with Flow().add(uses=VideoLoader) as flow:
+    with Flow().add(uses=VideoLoader, uses_requests={'/index': 'extract'}) as flow:
         resp = flow.post(on='/index', inputs=da, return_results=True)
 
     assert len(resp[0].docs) == 1
