@@ -240,7 +240,6 @@ class VideoLoader(Executor):
         subtitles = []
         prev_parts = []
         vtt_fn = self._convert_srt_to_vtt(srt_fn)
-        self.logger.info(f'convert to {vtt_fn}')
         for caption in webvtt.read(vtt_fn):
             cur_parts = [
                 t
@@ -287,13 +286,12 @@ class VideoLoader(Executor):
     def _convert_srt_to_vtt(self, srt_file):
         _srt_path = Path(srt_file)
         _vtt_path = _srt_path.parent / f'{_srt_path.stem}.vtt'
-        # _srt_fn = str(_srt_path)
-        _vtt_fn = str(_vtt_path)
+        # _vtt_fn = str(_vtt_path)
         try:
             result = webvtt.from_srt(_srt_path)
         except webvtt.errors.MalformedCaptionError as e:
             self.logger.warning('remove carriage returns from the .srt file')
             _srt_fn = self._remove_carriage_return(_srt_path)
             result = webvtt.from_srt(_srt_fn)
-        result.save(output=_vtt_fn)
-        return _vtt_fn
+        result.save(output=_vtt_path)
+        return _vtt_path
