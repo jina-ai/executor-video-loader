@@ -9,6 +9,6 @@ Image frame chunks have the `modality` of `image`, the audio chunks have the `mo
 
 | data | stored in | `modality` | `location` | `tags` | 
 | --- | --- | --- | --- | --- |
-| image frames | `blob` (dtype=`uint8`) | `image` | the index of the frame | `{'timestampe': 0.5}`, the timestamp of the frame in seconds |
-| audio | `blob` (dtype=`float32`) | `audio` | N/A | `{'sample_rate': 140000}`, the sample rate of the audio |
-| subtitle | `text` (dtype=`str`) | `text` | the index of the subtitle in the video | `{'beg_in_seconds': 0.5}`, the beginning of a caption in seconds, <br /> `{'end_in_seconds': 0.6}`, the end of a caption in seconds |
+| image frames | `blob` (dtype=`uint8`) | `image` | the index of the frame | `{'timestampe': 0.5}`, the timestamp of the frame in seconds. `{'video_uri': 'video.mp4'}`, the uri of the video |
+| audio | `blob` (dtype=`float32`) | `audio` | N/A | `{'sample_rate': 140000}`, the sample rate of the audio. `{'video_uri': 'video.mp4'}`, the uri of the video.  |
+| subtitle | `text` (dtype=`str`) | `text` | the index of the subtitle in the video | `{'beg_in_seconds': 0.5}`, the beginning of a caption in seconds, <br /> `{'end_in_seconds': 0.6}`, the end of a caption in seconds. `{'video_uri': 'video.mp4'}`, the uri of the video. |
