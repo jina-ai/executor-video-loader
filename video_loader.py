@@ -39,6 +39,7 @@ class VideoLoader(Executor):
         ffmpeg_audio_args: Optional[Dict] = None,
         ffmpeg_subtitle_args: Optional[Dict] = None,
         librosa_load_args: Optional[Dict] = None,
+        copy_uri: bool = True,
         **kwargs,
     ):
         """
@@ -56,9 +57,12 @@ class VideoLoader(Executor):
         :param librosa_load_args: the arguments to `librosa.load()` for converting audio data into `blob`. By default,
             the sampling rate (`sr`) is the same as in `ffmpeg_audio_args['ar']`, the flag for converting to mono
             (`mono`) is `True` when `ffmpeg_audio_args['ac'] > 1`
+        :param copy_uri: Set to `True` to store the video `uri` at the `.tags['video_uri']` of the chunks that are
+            extracted from the video. By default, `copy_uri=True`. Set this to `False` when the video uri is a data uri.
         """
         super().__init__(**kwargs)
         self._modality = modality_list
+        self._copy_uri = copy_uri
         self._ffmpeg_video_args = ffmpeg_video_args or {}
         self._ffmpeg_video_args.setdefault('format', 'rawvideo')
         self._ffmpeg_video_args.setdefault('pix_fmt', 'rgb24')
@@ -128,6 +132,8 @@ class VideoLoader(Executor):
                         chunk.blob = np.array(frame_blob).astype('uint8')
                         chunk.location.append(np.uint32(idx))
                         chunk.tags['timestamp'] = idx / self._frame_fps
+                        if self._copy_uri:
+                            chunk.tags['video_uri'] = doc.uri
                         doc.chunks.append(chunk)
 
                 # add audio as chunks to the Document, modality='audio'
@@ -145,6 +151,8 @@ class VideoLoader(Executor):
                         continue
                     chunk = Document(modality='audio')
                     chunk.blob, chunk.tags['sample_rate'] = audio, sr
+                    if self._copy_uri:
+                        chunk.tags['video_uri'] = doc.uri
                     doc.chunks.append(chunk)
 
                 # add subtitle ad chunks to the Document, modality='text'
@@ -160,6 +168,8 @@ class VideoLoader(Executor):
                         chunk = Document(text=s, modality='text')
                         chunk.tags['beg_in_seconds'] = beg
                         chunk.tags['end_in_seconds'] = end
+                        if self._copy_uri:
+                            chunk.tags['video_uri'] = doc.uri
                         chunk.location.append(idx)  # index of the subtitle in the video
                         doc.chunks.append(chunk)
 
