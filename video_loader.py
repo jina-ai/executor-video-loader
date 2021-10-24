@@ -11,6 +11,7 @@ import urllib.request
 import urllib.parse
 from copy import deepcopy
 from typing import Dict, Iterable, Optional
+from pathlib import Path
 
 import ffmpeg
 import librosa
@@ -203,7 +204,7 @@ class VideoLoader(Executor):
             return data, sample_rate
 
     def _convert_video_uri_to_subtitle(self, source_fn, ffmpeg_args, tmp_dir):
-        subtitle_file = str(os.path.join(tmp_dir, 'subs.vtt'))
+        subtitle_file = str(os.path.join(tmp_dir, 'subs.srt'))
         subtitles = []
         try:
             out, _ = (
@@ -233,12 +234,14 @@ class VideoLoader(Executor):
                 f.write(binary_fn.read())
         return tmp_fn
 
-    def _process_subtitles(self, subtitle_file):
+    def _process_subtitles(self, srt_fn):
         beg = None
         is_last_cap_complete = True
         subtitles = []
         prev_parts = []
-        for caption in webvtt.read(subtitle_file):
+        vtt_fn = self._convert_srt_to_vtt(srt_fn)
+        self.logger.info(f'convert to {vtt_fn}')
+        for caption in webvtt.read(vtt_fn):
             cur_parts = [
                 t
                 for t in filter(lambda x: len(x.strip()) > 0, caption.text.split('\n'))
@@ -264,3 +267,33 @@ class VideoLoader(Executor):
     def _is_datauri(self, uri):
         scheme = urllib.parse.urlparse(uri).scheme
         return scheme in {'data'}
+
+    def _remove_carriage_return(self, input_fn):
+        result = []
+        with open(input_fn, 'rb') as f:
+            for l in f:
+                if l == b'\r\n':
+                    continue
+                new_l = l.decode('utf8').replace('\r\n', '\n')
+                new_l = new_l.rstrip('\n')
+                result.append(new_l)
+        _input_path = input_fn
+        output_fn = f'{_input_path.stem}_no_cr{_input_path.suffix}'
+        output_fn = str(_input_path.parent / output_fn)
+        with open(output_fn, 'w') as f:
+            f.write('\n'.join(result))
+        return output_fn
+
+    def _convert_srt_to_vtt(self, srt_file):
+        _srt_path = Path(srt_file)
+        _vtt_path = _srt_path.parent / f'{_srt_path.stem}.vtt'
+        # _srt_fn = str(_srt_path)
+        _vtt_fn = str(_vtt_path)
+        try:
+            result = webvtt.from_srt(_srt_path)
+        except webvtt.errors.MalformedCaptionError as e:
+            self.logger.warning('remove carriage returns from the .srt file')
+            _srt_fn = self._remove_carriage_return(_srt_path)
+            result = webvtt.from_srt(_srt_fn)
+        result.save(output=_vtt_fn)
+        return _vtt_fn
