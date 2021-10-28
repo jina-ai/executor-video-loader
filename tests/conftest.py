@@ -53,5 +53,6 @@ def expected_float_fps_frames(tmp_path, video_fn):
         f'{os.path.join(str(tmp_path), f"%d.png")} >/dev/null 2>&1',
         shell=True,
     )
-    expected_frames = [np.array(Image.open(os.path.join(str(tmp_path), f'{i}.png'))) for i in range(15)]
+    tot_img = len(os.listdir(str(tmp_path)))
+    expected_frames = [np.array(Image.open(os.path.join(str(tmp_path), f'{i}.png'))) for i in range(tot_img)]
     return expected_frames
