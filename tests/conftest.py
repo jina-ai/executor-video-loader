@@ -47,9 +47,9 @@ def srt_path():
 
 
 @pytest.fixture(scope='function')
-def expected_float_fps_frames(tmp_path, video_fn):
+def expected_float_fps_frames(tmp_path, video_fn, fps):
     subprocess.check_call(
-        f'ffmpeg -loglevel panic -i {video_fn} -vsync 0 -vf fps=1.5 -frame_pts true '
+        f'ffmpeg -loglevel panic -i {video_fn} -vsync 0 -vf fps={fps} -frame_pts true '
         f'{os.path.join(str(tmp_path), f"%d.png")} >/dev/null 2>&1',
         shell=True,
     )
