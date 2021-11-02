@@ -44,3 +44,15 @@ def expected_audio(tmp_path, video_fn, videoLoader):
 @pytest.fixture(scope='session')
 def srt_path():
     return data_dir / 'subs_with_carriage_returns.srt'
+
+
+@pytest.fixture(scope='function')
+def expected_float_fps_frames(tmp_path, video_fn, fps):
+    subprocess.check_call(
+        f'ffmpeg -loglevel panic -i {video_fn} -vsync 0 -vf fps={fps} -frame_pts true '
+        f'{os.path.join(str(tmp_path), f"%d.png")} >/dev/null 2>&1',
+        shell=True,
+    )
+    tot_img = len(os.listdir(str(tmp_path)))
+    expected_frames = [np.array(Image.open(os.path.join(str(tmp_path), f'{i}.png'))) for i in range(tot_img)]
+    return expected_frames

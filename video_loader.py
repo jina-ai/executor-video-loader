@@ -20,7 +20,7 @@ import webvtt
 from jina import Document, DocumentArray, Executor, requests
 from jina.logging.logger import JinaLogger
 
-DEFAULT_FPS = 1
+DEFAULT_FPS = 1.0
 DEFAULT_AUDIO_BIT_RATE = 160000
 DEFAULT_AUDIO_CHANNELS = 2
 DEFAULT_AUDIO_SAMPLING_RATE = 44100  # Hz
@@ -69,9 +69,9 @@ class VideoLoader(Executor):
         self._ffmpeg_video_args.setdefault('frame_pts', True)
         self._ffmpeg_video_args.setdefault('vsync', 0)
         self._ffmpeg_video_args.setdefault('vf', f'fps={DEFAULT_FPS}')
-        fps = re.findall('.*fps=(\d+).*', self._ffmpeg_video_args['vf'])
+        fps = re.findall('.*fps=(\d+(?:\.\d+)?).*', self._ffmpeg_video_args['vf'])
         if len(fps) > 0:
-            self._frame_fps = int(fps[0])
+            self._frame_fps = float(fps[0])
 
         self._ffmpeg_audio_args = ffmpeg_audio_args or {}
         self._ffmpeg_audio_args.setdefault('format', 'wav')

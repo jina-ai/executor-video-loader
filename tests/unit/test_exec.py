@@ -105,3 +105,14 @@ def test_modality(video_fn, copy_uri):
             assert (uri is not None) == copy_uri
             if uri is not None:
                 assert uri == video_fn
+
+
+@pytest.mark.parametrize('fps', [.5, 1.5, 2., 3])
+def test_float_fps_count(expected_float_fps_frames, video_fn, fps):
+    videoLoader = VideoLoader(modality_list='image', ffmpeg_video_args={'vf': f'fps={fps}'})
+    docs = DocumentArray([Document(uri=video_fn)])
+    videoLoader.extract(docs=docs)
+    for doc in docs:
+        c_img = [c.content for c in doc.chunks if c.modality == 'image']
+        assert len(c_img) == len(expected_float_fps_frames)
+        assert np.allclose(c_img[:5], expected_float_fps_frames[:5])
