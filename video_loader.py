@@ -130,7 +130,7 @@ class VideoLoader(Executor):
                         self.logger.debug(f'frame: {idx}')
                         chunk = Document(modality='image')
                         chunk.blob = np.array(frame_blob).astype('uint8')
-                        chunk.location.append(np.uint32(idx))
+                        chunk.location = (np.uint32(idx), )
                         chunk.tags['timestamp'] = idx / self._frame_fps
                         if self._copy_uri:
                             chunk.tags['video_uri'] = doc.uri
@@ -170,7 +170,7 @@ class VideoLoader(Executor):
                         chunk.tags['end_in_seconds'] = end
                         if self._copy_uri:
                             chunk.tags['video_uri'] = doc.uri
-                        chunk.location.append(idx)  # index of the subtitle in the video
+                        chunk.location = (idx,)  # index of the subtitle in the video
                         doc.chunks.append(chunk)
 
     def _convert_video_uri_to_frames(self, source_fn, uri, ffmpeg_args):
