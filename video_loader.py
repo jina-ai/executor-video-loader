@@ -170,7 +170,7 @@ class VideoLoader(Executor):
                         chunk.tags['end_in_seconds'] = end
                         if self._copy_uri:
                             chunk.tags['video_uri'] = doc.uri
-                        chunk.location.append(idx)  # index of the subtitle in the video
+                        chunk.location = (idx,)  # index of the subtitle in the video
                         doc.chunks.append(chunk)
 
     def _convert_video_uri_to_frames(self, source_fn, uri, ffmpeg_args):

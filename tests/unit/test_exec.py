@@ -101,9 +101,9 @@ def test_modality(video_fn, copy_uri):
     videoLoader.extract(docs=docs)
     for doc in docs:
         for c in doc.chunks:
-            uri = c.tags.get('video_uri', None)
-            assert (uri is not None) == copy_uri
-            if uri is not None:
+            uri = c.tags.get('video_uri')
+            assert (len(uri) > 0) == copy_uri
+            if len(uri) > 0:
                 assert uri == video_fn
 
 
