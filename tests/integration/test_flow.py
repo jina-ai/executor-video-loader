@@ -2,17 +2,18 @@ __copyright__ = 'Copyright (c) 2021 Jina AI Limited. All rights reserved.'
 __license__ = 'Apache-2.0'
 
 import numpy as np
-from jina import Document, DocumentArray, Flow
+from jina import Flow
+from docarray import Document, DocumentArray
 
 from video_loader import VideoLoader
 
 
 def test_integration(expected_frames, expected_audio):
-    da = DocumentArray(
-        [Document(id='1bh98dhj3.mkv', uri='tests/toy_data/1q83w3rehj3.mkv')]
-    )
-    with Flow().add(uses=VideoLoader, uses_requests={'/index': 'extract'}) as flow:
-        resp = flow.post(on='/index', inputs=da, return_results=True)
+    da = DocumentArray([Document(uri='tests/toy_data/1q83w3rehj3.mkv')])
+    with Flow(return_responses=True).add(
+        uses=VideoLoader, uses_requests={'/index': 'extract'}
+    ) as flow:
+        resp = flow.post(on='/index', inputs=da)
 
     assert len(resp[0].docs) == 1
     for doc in resp[0].docs:

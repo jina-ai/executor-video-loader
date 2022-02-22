@@ -1,4 +1,4 @@
-FROM jinaai/jina:2-py37-perf
+FROM jinaai/jina:master-py37-perf
 
 RUN apt-get -y update && apt-get install -y git ffmpeg libsndfile1
 
