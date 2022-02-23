@@ -17,7 +17,8 @@ import ffmpeg
 import librosa
 import numpy as np
 import webvtt
-from jina import Document, DocumentArray, Executor, requests
+from jina import Executor, requests
+from docarray import Document, DocumentArray
 from jina.logging.logger import JinaLogger
 
 DEFAULT_FPS = 1.0
@@ -54,7 +55,7 @@ class VideoLoader(Executor):
         :param ffmpeg_subtitle_args: the arguments to `ffmpeg` for extracting subtitle. By default, we extract the first
             subtitle by setting `map='0:s:0'`. To extract second subtitle in a video use
             `ffmpeg_subtitle_args{map='0:s:1'}` and so on.
-        :param librosa_load_args: the arguments to `librosa.load()` for converting audio data into `blob`. By default,
+        :param librosa_load_args: the arguments to `librosa.load()` for converting audio data into `tensor`. By default,
             the sampling rate (`sr`) is the same as in `ffmpeg_audio_args['ar']`, the flag for converting to mono
             (`mono`) is `True` when `ffmpeg_audio_args['ac'] > 1`
         :param copy_uri: Set to `True` to store the video `uri` at the `.tags['video_uri']` of the chunks that are
@@ -83,16 +84,14 @@ class VideoLoader(Executor):
         self._ffmpeg_subtitle_args.setdefault('map', DEFAULT_SUBTITLE_MAP)
 
         self._librosa_load_args = librosa_load_args or {}
-        self._librosa_load_args.setdefault(
-            'sr', self._ffmpeg_audio_args['ar'])
-        self._librosa_load_args.setdefault(
-            'mono', self._ffmpeg_audio_args['ac'] > 1)
+        self._librosa_load_args.setdefault('sr', self._ffmpeg_audio_args['ar'])
+        self._librosa_load_args.setdefault('mono', self._ffmpeg_audio_args['ac'] > 1)
         self.logger = JinaLogger(
             getattr(self.metas, 'name', self.__class__.__name__)
         ).logger
 
     @requests(on='/extract')
-    def extract(self, docs: Optional[DocumentArray] = None, parameters: Dict = {}, **kwargs):
+    def extract(self, docs: DocumentArray, parameters: Dict, **kwargs):
         """
         Load the video from the Document.uri, extract frames and audio. The extracted data are stored in chunks.
 
@@ -102,8 +101,6 @@ class VideoLoader(Executor):
         Possible values are `ffmpeg_audio_args`, `ffmpeg_video_args`, `librosa_load_args`. Check out more description in the `__init__()`.
         For example, `parameters={'ffmpeg_video_args': {'s': '512x320'}`.
         """
-        if docs is None:
-            return
         for doc in docs:
             self.logger.info(f'received {doc.id}')
 
@@ -122,15 +119,14 @@ class VideoLoader(Executor):
                 if 'image' in self._modality:
                     ffmpeg_video_args = deepcopy(self._ffmpeg_video_args)
                     ffmpeg_video_args.update(parameters.get('ffmpeg_video_args', {}))
-                    frame_blobs = self._convert_video_uri_to_frames(
-                        source_fn,
-                        doc.uri,
-                        ffmpeg_video_args)
-                    for idx, frame_blob in enumerate(frame_blobs):
+                    frame_tensors = self._convert_video_uri_to_frames(
+                        source_fn, doc.uri, ffmpeg_video_args
+                    )
+                    for idx, frame_tensor in enumerate(frame_tensors):
                         self.logger.debug(f'frame: {idx}')
                         chunk = Document(modality='image')
-                        chunk.blob = np.array(frame_blob).astype('uint8')
-                        chunk.location = (np.uint32(idx), )
+                        chunk.tensor = np.array(frame_tensor).astype('uint8')
+                        chunk.location = (np.uint32(idx),)
                         chunk.tags['timestamp'] = idx / self._frame_fps
                         if self._copy_uri:
                             chunk.tags['video_uri'] = doc.uri
@@ -143,14 +139,12 @@ class VideoLoader(Executor):
                     librosa_load_args = deepcopy(self._librosa_load_args)
                     librosa_load_args.update(parameters.get('librosa_load_args', {}))
                     audio, sr = self._convert_video_uri_to_audio(
-                        source_fn,
-                        doc.uri,
-                        ffmpeg_audio_args,
-                        librosa_load_args)
+                        source_fn, doc.uri, ffmpeg_audio_args, librosa_load_args
+                    )
                     if audio is None:
                         continue
                     chunk = Document(modality='audio')
-                    chunk.blob, chunk.tags['sample_rate'] = audio, sr
+                    chunk.tensor, chunk.tags['sample_rate'] = audio, sr
                     if self._copy_uri:
                         chunk.tags['video_uri'] = doc.uri
                     doc.chunks.append(chunk)
@@ -183,10 +177,7 @@ class VideoLoader(Executor):
             h = int(h)
             out, _ = (
                 ffmpeg.input(source_fn)
-                .output(
-                    'pipe:',
-                    **ffmpeg_args
-                )
+                .output('pipe:', **ffmpeg_args)
                 .run(capture_stdout=True, quiet=True)
             )
             video_frames = np.frombuffer(out, np.uint8).reshape([-1, h, w, 3])
@@ -204,10 +195,11 @@ class VideoLoader(Executor):
                 .output('pipe:', **ffmpeg_args)
                 .run(capture_stdout=True, quiet=True)
             )
-            data, sample_rate = librosa.load(
-                io.BytesIO(out), **librosa_args)
+            data, sample_rate = librosa.load(io.BytesIO(out), **librosa_args)
         except ffmpeg.Error as e:
-            self.logger.error(f'Audio extraction failed with ffmpeg, uri: {uri}, {e.stderr}')
+            self.logger.error(
+                f'Audio extraction failed with ffmpeg, uri: {uri}, {e.stderr}'
+            )
         except librosa.LibrosaError as e:
             self.logger.error(f'Array conversion failed with librosa, uri: {uri}, {e}')
         finally:
@@ -224,9 +216,7 @@ class VideoLoader(Executor):
             )
             subtitles = self._process_subtitles(Path(subtitle_fn))
         except ffmpeg.Error as e:
-            self.logger.error(
-                f'Subtitle extraction failed with ffmpeg, {e.stderr}'
-            )
+            self.logger.error(f'Subtitle extraction failed with ffmpeg, {e.stderr}')
         finally:
             return subtitles
 
@@ -244,7 +234,9 @@ class VideoLoader(Executor):
                 f.write(binary_fn.read())
         return tmp_fn
 
-    def _process_subtitles(self, srt_path: Path, vtt_path: Path=None, tmp_srt_path: Path=None):
+    def _process_subtitles(
+        self, srt_path: Path, vtt_path: Path = None, tmp_srt_path: Path = None
+    ):
         beg = None
         is_last_cap_complete = True
         subtitles = []
@@ -294,7 +286,9 @@ class VideoLoader(Executor):
             f.write('\n'.join(result))
         return output_path
 
-    def _convert_srt_to_vtt(self, srt_path: Path, vtt_path: Path=None, tmp_srt_path: Path=None):
+    def _convert_srt_to_vtt(
+        self, srt_path: Path, vtt_path: Path = None, tmp_srt_path: Path = None
+    ):
         if vtt_path is None:
             vtt_path = srt_path.parent / f'{srt_path.stem}.vtt'
         try:
